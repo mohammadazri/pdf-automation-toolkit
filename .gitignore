@@ -1,3 +1,12 @@
 # Ignore all text file
 *.txt
 
+#Ignore version control system files
+.vscode/
+.git/
+
+#Ignore venv folder
+venv/
+
+#Dont ignore requirements.txt
+!requirements.txt

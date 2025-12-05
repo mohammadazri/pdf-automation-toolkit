@@ -1,0 +1,4 @@
+Pillow
+PyMuPDF
+reportlab
+PyPDF2
