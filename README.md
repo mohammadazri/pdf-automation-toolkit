@@ -1,8 +1,20 @@
 <div align="center">
   <img src="https://img.shields.io/badge/PDF%20Automation-Toolkit-blueviolet?style=for-the-badge" alt="PDF Automation Toolkit" />
-  <h1>PDF Automation Toolkit</h1>
-  <p><b>For organizers/committees who need 100+ certificates fast. Pick a template, mark the name area, and export.</b></p>
+   <h1>PDF Automation Toolkit</h1>
+   <p><b>This script lets you use your own PDF certificate design and automatically fills in hundreds of participant names—perfect for events, classes, or workshops!</b></p>
+   <!-- You can add a relevant PDF automation image here if you want -->
+<br>
+<a href="https://github.com/mohammadazri/pdf-automation-toolkit">
+   <img src="https://img.shields.io/github/stars/mohammadazri/pdf-automation-toolkit?style=social" alt="GitHub stars"/>
+</a>
+<a href="https://github.com/mohammadazri/pdf-automation-toolkit">
+   <img src="https://img.shields.io/github/forks/mohammadazri/pdf-automation-toolkit?style=social" alt="GitHub forks"/>
+</a>
+<a href="https://github.com/mohammadazri/pdf-automation-toolkit/blob/master/LICENSE">
+   <img src="https://img.shields.io/github/license/mohammadazri/pdf-automation-toolkit?color=brightgreen" alt="License"/>
+</a>
 </div>
+
 
 ---
 
