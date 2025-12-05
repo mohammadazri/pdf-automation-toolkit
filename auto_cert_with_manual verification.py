@@ -16,56 +16,78 @@ from reportlab.pdfgen import canvas
 from PyPDF2 import PdfReader, PdfWriter
 
 
-PALETTE = {
-    "bg": "#0f172a",
-    "card": "#111827",
-    "muted": "#9ca3af",
-    "text": "#e5e7eb",
-    "accent": "#22c55e",
-    "accent_hover": "#16a34a",
-    "outline": "#1f2937",
+THEMES = {
+    "dark": {
+        "bg": "#050914",
+        "bg_alt": "#0f172a",
+        "card": "#111827",
+        "muted": "#9ca3af",
+        "text": "#f1f5f9",
+        "subtext": "#cbd5f5",
+        "accent": "#22c55e",
+        "accent_hover": "#16a34a",
+        "outline": "#1f2937",
+        "shadow": "#020617",
+    },
+    "light": {
+        "bg": "#f8fafc",
+        "bg_alt": "#eef2ff",
+        "card": "#ffffff",
+        "muted": "#64748b",
+        "text": "#0f172a",
+        "subtext": "#475569",
+        "accent": "#2563eb",
+        "accent_hover": "#1d4ed8",
+        "outline": "#d0d7e3",
+        "shadow": "#cbd5f5",
+    },
 }
 
 FONT_FAMILY = "Segoe UI"
 
 
-def build_style(root: tk.Tk) -> None:
-    """Apply a modern, minimal theme to ttk widgets."""
+def build_style(root: tk.Tk, palette: Dict[str, str]) -> None:
+    """Apply a modern, minimal theme to ttk widgets based on the active palette."""
 
     style = ttk.Style(root)
     style.theme_use("clam")
 
-    style.configure("Card.TFrame", background=PALETTE["card"])
-    style.configure("Card.TLabel", background=PALETTE["card"], foreground=PALETTE["text"], font=(FONT_FAMILY, 11))
-    style.configure("Heading.TLabel", background=PALETTE["card"], foreground=PALETTE["text"], font=(FONT_FAMILY, 14, "bold"))
-    style.configure("Emphasis.TLabel", background=PALETTE["card"], foreground=PALETTE["accent"], font=(FONT_FAMILY, 11, "bold"))
-    style.configure("Status.TLabel", background=PALETTE["card"], foreground=PALETTE["muted"], font=(FONT_FAMILY, 10))
+    style.configure("Card.TFrame", background=palette["card"])
+    style.configure("Card.TLabel", background=palette["card"], foreground=palette["text"], font=(FONT_FAMILY, 11))
+    style.configure("Heading.TLabel", background=palette["card"], foreground=palette["text"], font=(FONT_FAMILY, 14, "bold"))
+    style.configure("Emphasis.TLabel", background=palette["card"], foreground=palette["accent"], font=(FONT_FAMILY, 11, "bold"))
+    style.configure("Status.TLabel", background=palette["card"], foreground=palette["muted"], font=(FONT_FAMILY, 10))
 
-    style.configure("Title.TLabel", background=PALETTE["bg"], foreground=PALETTE["text"], font=(FONT_FAMILY, 22, "bold"))
-    style.configure("Subtitle.TLabel", background=PALETTE["bg"], foreground=PALETTE["muted"], font=(FONT_FAMILY, 11))
+    style.configure("Title.TLabel", background=palette["bg"], foreground=palette["text"], font=(FONT_FAMILY, 24, "bold"))
+    style.configure("Subtitle.TLabel", background=palette["bg"], foreground=palette["muted"], font=(FONT_FAMILY, 11))
 
-    style.configure("TLabel", background=PALETTE["card"], foreground=PALETTE["text"], font=(FONT_FAMILY, 11))
+    style.configure("TLabel", background=palette["card"], foreground=palette["text"], font=(FONT_FAMILY, 11))
     style.configure("TButton", font=(FONT_FAMILY, 11), padding=8)
     style.configure(
         "Accent.TButton",
         font=(FONT_FAMILY, 11, "bold"),
         padding=10,
-        foreground=PALETTE["bg"],
-        background=PALETTE["accent"],
+        foreground=palette["bg"],
+        background=palette["accent"],
         borderwidth=0,
     )
     style.map(
         "Accent.TButton",
-        background=[("active", PALETTE["accent_hover"]), ("pressed", PALETTE["accent"])],
-        foreground=[("disabled", PALETTE["muted"])],
+        background=[("active", palette["accent_hover"]), ("pressed", palette["accent"])],
+        foreground=[("disabled", palette["muted"])],
     )
 
+    style.configure("Surface.TFrame", background=palette["bg"])
+    style.configure("Hero.TFrame", background=palette["bg"])
+    style.configure("Metric.TLabel", background=palette["card"], foreground=palette["accent"], font=(FONT_FAMILY, 26, "bold"))
+    style.configure("MetricCaption.TLabel", background=palette["card"], foreground=palette["muted"], font=(FONT_FAMILY, 10))
+
     style.configure("TCombobox", padding=6, font=(FONT_FAMILY, 11))
-    style.map("TCombobox", fieldbackground=[("readonly", PALETTE["card"])], foreground=[("readonly", PALETTE["text"])])
+    style.map("TCombobox", fieldbackground=[("readonly", palette["card"])], foreground=[("readonly", palette["text"])])
 
     root.option_add("*TCombobox*Listbox*Font", (FONT_FAMILY, 11))
-    root.option_add("*TCombobox*Listbox*Background", PALETTE["card"])
-    root.option_add("*TCombobox*Listbox*Foreground", PALETTE["text"])
+    root.option_add("*TCombobox*Listbox*Background", palette["card"])
+    root.option_add("*TCombobox*Listbox*Foreground", palette["text"])
 
 
 class CertificateApp:
@@ -74,8 +96,10 @@ class CertificateApp:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("Certificate Generator — Modern UI")
-        self.root.configure(bg=PALETTE["bg"])
-        self.root.minsize(820, 520)
+        self.theme_name = tk.StringVar(value="dark")
+        self.palette = THEMES[self.theme_name.get()]
+        self.root.configure(bg=self.palette["bg"])
+        self.root.minsize(920, 640)
 
         self.available_fonts = self.load_fonts()
         self.selected_font = tk.StringVar(value=next(iter(self.available_fonts)))
@@ -90,9 +114,46 @@ class CertificateApp:
         self.rect_info: Optional[dict] = None
         self.last_font_size: Optional[int] = None
 
-        build_style(self.root)
+        # UI state string variables
+        self.pdf_status = tk.StringVar(value="No template selected")
+        self.names_status = tk.StringVar(value="No names file selected")
+        self.area_status = tk.StringVar(value="Area not selected")
+        self.progress_status = tk.StringVar(value="Waiting to start…")
+        self.names_metric = tk.StringVar(value="0")
+        self.area_metric = tk.StringVar(value="Not selected")
+        self.theme_button_text = tk.StringVar()
+
+        build_style(self.root, self.palette)
+        self.update_theme_button_label()
         self.build_layout()
+        self.refresh_metrics()
         self.root.mainloop()
+
+    def update_theme_button_label(self) -> None:
+        target = "Light" if self.theme_name.get() == "dark" else "Dark"
+        self.theme_button_text.set(f"Switch to {target} Mode")
+
+    def refresh_metrics(self) -> None:
+        self.names_metric.set(str(len(self.names)))
+        if self.rect_info:
+            self.area_metric.set(f"{int(self.rect_info['rect_width'])} × {int(self.rect_info['rect_height'])} px")
+        else:
+            self.area_metric.set("Not selected")
+
+    def toggle_theme(self) -> None:
+        new_theme = "light" if self.theme_name.get() == "dark" else "dark"
+        self.theme_name.set(new_theme)
+        self.palette = THEMES[new_theme]
+        self.update_theme_button_label()
+        self.rebuild_ui()
+
+    def rebuild_ui(self) -> None:
+        for child in self.root.winfo_children():
+            child.destroy()
+        build_style(self.root, self.palette)
+        self.build_layout()
+        self.refresh_metrics()
+        self.update_ready_state()
 
     def load_fonts(self) -> Dict[str, str]:
         """Auto-register TTF/OTF fonts from the bundled fonts directory."""
@@ -127,87 +188,170 @@ class CertificateApp:
         return available_fonts
 
     def build_layout(self) -> None:
-        """Compose the guided workflow UI."""
+        """Compose a two-column layout with hero header, metrics, and workflow controls."""
 
-        header = tk.Frame(self.root, bg=PALETTE["bg"], padx=28, pady=18)
-        header.pack(fill="x")
+        self.root.configure(bg=self.palette["bg"])
 
-        ttk.Label(header, text="Certificate Automation", style="Title.TLabel").pack(anchor="w")
+        container = ttk.Frame(self.root, style="Surface.TFrame")
+        container.pack(fill="both", expand=True)
+
+        canvas = tk.Canvas(container, bg=self.palette["bg"], highlightthickness=0, borderwidth=0)
+        v_scroll = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=v_scroll.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        v_scroll.pack(side="right", fill="y")
+
+        surface = ttk.Frame(canvas, style="Surface.TFrame")
+        surface_id = canvas.create_window((0, 0), window=surface, anchor="nw")
+
+        def _refresh_scroll_region(_event=None) -> None:
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _sync_surface_width(event) -> None:
+            canvas.itemconfigure(surface_id, width=event.width)
+
+        def _on_mousewheel(event) -> None:
+            if event.widget.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        surface.bind("<Configure>", _refresh_scroll_region)
+        canvas.bind("<Configure>", _sync_surface_width)
+        surface.bind("<Enter>", lambda _e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        surface.bind("<Leave>", lambda _e: canvas.unbind_all("<MouseWheel>"))
+
+        # Hero section
+        hero = ttk.Frame(surface, style="Hero.TFrame", padding=(32, 24))
+        hero.pack(fill="x")
+        hero.columnconfigure(0, weight=1)
+        hero.columnconfigure(1, weight=0)
+
+        hero_text = ttk.Frame(hero, style="Hero.TFrame")
+        hero_text.grid(row=0, column=0, sticky="nsew")
+        ttk.Label(hero_text, text="Certificate Automation", style="Title.TLabel").pack(anchor="w")
         ttk.Label(
-            header,
-            text="A guided, modern flow to pick files, choose fonts, mark placement, and review outputs.",
+            hero_text,
+            text="Load your template, mark a placement zone, and export polished certificates in minutes.",
             style="Subtitle.TLabel",
-        ).pack(anchor="w", pady=(4, 0))
+        ).pack(anchor="w", pady=(8, 0))
 
-        card = ttk.Frame(self.root, style="Card.TFrame", padding=22)
-        card.pack(fill="both", expand=True, padx=22, pady=(0, 22))
-        card.columnconfigure(0, weight=1)
-        card.columnconfigure(1, weight=1)
+        metrics_frame = ttk.Frame(hero_text, style="Hero.TFrame")
+        metrics_frame.pack(fill="x", pady=(20, 0))
+        metrics_frame.columnconfigure(0, weight=1)
+        metrics_frame.columnconfigure(1, weight=1)
 
-        # Step 1 — file selection
-        ttk.Label(card, text="1. Pick your files", style="Heading.TLabel").grid(row=0, column=0, sticky="w")
+        names_card = ttk.Frame(metrics_frame, style="Card.TFrame", padding=16)
+        names_card.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        ttk.Label(names_card, textvariable=self.names_metric, style="Metric.TLabel").pack(anchor="w")
+        ttk.Label(names_card, text="Names loaded", style="MetricCaption.TLabel").pack(anchor="w")
 
-        file_row = ttk.Frame(card, style="Card.TFrame")
-        file_row.grid(row=1, column=0, sticky="ew", pady=(8, 18))
-        file_row.columnconfigure(1, weight=1)
+        area_card = ttk.Frame(metrics_frame, style="Card.TFrame", padding=16)
+        area_card.grid(row=0, column=1, sticky="nsew")
+        ttk.Label(area_card, textvariable=self.area_metric, style="Metric.TLabel").pack(anchor="w")
+        ttk.Label(area_card, text="Placement window", style="MetricCaption.TLabel").pack(anchor="w")
 
-        self.pdf_status = tk.StringVar(value="No template selected")
-        self.names_status = tk.StringVar(value="No names file selected")
+        hero_actions = ttk.Frame(hero, style="Hero.TFrame")
+        hero_actions.grid(row=0, column=1, sticky="ne")
+        ttk.Button(hero_actions, textvariable=self.theme_button_text, style="Accent.TButton", command=self.toggle_theme).pack(anchor="e")
 
-        ttk.Button(file_row, text="Choose template PDF", style="Accent.TButton", command=self.choose_pdf).grid(
-            row=0, column=0, padx=(0, 12), pady=4
+        # Content area
+        content = ttk.Frame(surface, style="Surface.TFrame", padding=(28, 22))
+        content.pack(fill="both", expand=True)
+        content.columnconfigure(0, weight=2)
+        content.columnconfigure(1, weight=1)
+
+        steps_card = ttk.Frame(content, style="Card.TFrame", padding=24)
+        steps_card.grid(row=0, column=0, sticky="nsew", padx=(0, 18))
+        steps_card.columnconfigure(0, weight=1)
+
+        self.build_steps_panel(steps_card)
+
+        insights_card = ttk.Frame(content, style="Card.TFrame", padding=24)
+        insights_card.grid(row=0, column=1, sticky="nsew")
+        insights_card.columnconfigure(0, weight=1)
+
+        ttk.Label(insights_card, text="Status snapshot", style="Heading.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Separator(insights_card).grid(row=1, column=0, sticky="ew", pady=(8, 14))
+
+        summary_rows = [
+            ("Template", self.pdf_status),
+            ("Names", self.names_status),
+            ("Placement", self.area_status),
+        ]
+        for idx, (label_text, text_var) in enumerate(summary_rows, start=2):
+            row_frame = ttk.Frame(insights_card, style="Card.TFrame")
+            row_frame.grid(row=idx, column=0, sticky="ew", pady=4)
+            row_frame.columnconfigure(1, weight=1)
+            ttk.Label(row_frame, text=label_text, style="Emphasis.TLabel").grid(row=0, column=0, sticky="nw", padx=(0, 8))
+            ttk.Label(row_frame, textvariable=text_var, style="Status.TLabel", wraplength=220).grid(row=0, column=1, sticky="w")
+
+        progress_row = 2 + len(summary_rows)
+        ttk.Separator(insights_card).grid(row=progress_row + 1, column=0, sticky="ew", pady=(12, 12))
+        ttk.Label(insights_card, text="Progress", style="Heading.TLabel").grid(row=progress_row + 2, column=0, sticky="w")
+        ttk.Label(insights_card, textvariable=self.progress_status, style="Status.TLabel", wraplength=260).grid(
+            row=progress_row + 3, column=0, sticky="w", pady=(8, 0)
         )
-        ttk.Label(file_row, textvariable=self.pdf_status, style="Card.TLabel").grid(row=0, column=1, sticky="w")
 
-        ttk.Button(file_row, text="Choose names TXT", command=self.choose_names).grid(row=1, column=0, padx=(0, 12), pady=4)
-        ttk.Label(file_row, textvariable=self.names_status, style="Card.TLabel").grid(row=1, column=1, sticky="w")
+        tips = (
+            "💡 Use precise rectangles for multi-line names",
+            "🗂️ Fonts auto-sync from the fonts/ directory",
+        )
+        tips_frame = ttk.Frame(insights_card, style="Card.TFrame")
+        tips_frame.grid(row=progress_row + 4, column=0, sticky="ew", pady=(16, 0))
+        for tip in tips:
+            ttk.Label(tips_frame, text=tip, style="Status.TLabel", wraplength=260).pack(anchor="w", pady=2)
 
-        # Step 2 — font selection
-        ttk.Label(card, text="2. Pick your font", style="Heading.TLabel").grid(row=2, column=0, sticky="w")
+    def build_steps_panel(self, container: ttk.Frame) -> None:
+        ttk.Label(container, text="Workflow", style="Heading.TLabel").grid(row=0, column=0, sticky="w")
 
-        font_row = ttk.Frame(card, style="Card.TFrame")
-        font_row.grid(row=3, column=0, sticky="ew", pady=(8, 18))
-        font_row.columnconfigure(1, weight=1)
+        # Step 1 — Files
+        files_section = ttk.Frame(container, style="Card.TFrame")
+        files_section.grid(row=1, column=0, sticky="ew", pady=(12, 0))
+        files_section.columnconfigure(1, weight=1)
+        ttk.Label(files_section, text="1. Source files", style="Emphasis.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        ttk.Button(files_section, text="Choose template PDF", style="Accent.TButton", command=self.choose_pdf).grid(row=1, column=0, padx=(0, 12), pady=4)
+        ttk.Label(files_section, textvariable=self.pdf_status, style="Card.TLabel").grid(row=1, column=1, sticky="w")
+        ttk.Button(files_section, text="Choose names TXT", command=self.choose_names).grid(row=2, column=0, padx=(0, 12), pady=4)
+        ttk.Label(files_section, textvariable=self.names_status, style="Card.TLabel").grid(row=2, column=1, sticky="w")
 
-        ttk.Label(font_row, text="Certificate font", style="Card.TLabel").grid(row=0, column=0, sticky="w", pady=2)
+        # Step 2 — Font
+        font_section = ttk.Frame(container, style="Card.TFrame")
+        font_section.grid(row=2, column=0, sticky="ew", pady=(18, 0))
+        font_section.columnconfigure(1, weight=1)
+        ttk.Label(font_section, text="2. Typography", style="Emphasis.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        ttk.Label(font_section, text="Certificate font", style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=2)
         self.font_selector = ttk.Combobox(
-            font_row,
+            font_section,
             textvariable=self.selected_font,
             values=list(self.available_fonts.keys()),
             state="readonly",
         )
-        self.font_selector.grid(row=0, column=1, sticky="ew", padx=(10, 0))
-
+        self.font_selector.grid(row=1, column=1, sticky="ew", padx=(10, 0))
         ttk.Label(
-            font_row,
-            text="Fonts are auto-loaded from the 'fonts' folder. Add your own TTF/OTF files to expand the list.",
+            font_section,
+            text="Drop new .ttf/.otf files into the fonts/ folder to expand this list instantly.",
             style="Status.TLabel",
-        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+            wraplength=420,
+        ).grid(row=2, column=0, columnspan=2, sticky="w", pady=(8, 0))
 
-        # Step 3 — area selection
-        ttk.Label(card, text="3. Mark the name area", style="Heading.TLabel").grid(row=4, column=0, sticky="w")
+        # Step 3 — Placement
+        area_section = ttk.Frame(container, style="Card.TFrame")
+        area_section.grid(row=3, column=0, sticky="ew", pady=(18, 0))
+        area_section.columnconfigure(1, weight=1)
+        ttk.Label(area_section, text="3. Placement", style="Emphasis.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        ttk.Button(area_section, text="Select placement area", command=self.select_area).grid(row=1, column=0, padx=(0, 12), pady=4)
+        ttk.Label(area_section, textvariable=self.area_status, style="Card.TLabel").grid(row=1, column=1, sticky="w")
 
-        area_row = ttk.Frame(card, style="Card.TFrame")
-        area_row.grid(row=5, column=0, sticky="ew", pady=(8, 18))
-        area_row.columnconfigure(1, weight=1)
-
-        self.area_status = tk.StringVar(value="Area not selected")
-        ttk.Button(area_row, text="Select placement area", command=self.select_area).grid(row=0, column=0, padx=(0, 12), pady=4)
-        ttk.Label(area_row, textvariable=self.area_status, style="Card.TLabel").grid(row=0, column=1, sticky="w")
-
-        # Step 4 — generate
-        ttk.Label(card, text="4. Review & export", style="Heading.TLabel").grid(row=6, column=0, sticky="w")
-
-        action_row = ttk.Frame(card, style="Card.TFrame")
-        action_row.grid(row=7, column=0, sticky="ew", pady=(8, 0))
-        action_row.columnconfigure(0, weight=1)
-
-        self.start_button = ttk.Button(action_row, text="Start manual review", style="Accent.TButton", command=self.start_review)
-        self.start_button.grid(row=0, column=0, sticky="ew")
+        # Step 4 — Review
+        review_section = ttk.Frame(container, style="Card.TFrame")
+        review_section.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+        review_section.columnconfigure(0, weight=1)
+        ttk.Label(review_section, text="4. Review & export", style="Emphasis.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        self.start_button = ttk.Button(review_section, text="Start manual review", style="Accent.TButton", command=self.start_review)
+        self.start_button.grid(row=1, column=0, sticky="ew")
         self.start_button.state(["disabled"])
-
-        self.progress_status = tk.StringVar(value="Waiting to start…")
-        ttk.Label(action_row, textvariable=self.progress_status, style="Status.TLabel").grid(row=1, column=0, sticky="w", pady=(8, 0))
+        ttk.Label(review_section, textvariable=self.progress_status, style="Status.TLabel", wraplength=420).grid(
+            row=2, column=0, sticky="w", pady=(10, 0)
+        )
 
     def choose_pdf(self) -> None:
         path = filedialog.askopenfilename(title="Select Certificate Template PDF", filetypes=[["PDF Files", "*.pdf"]])
@@ -221,6 +365,7 @@ class CertificateApp:
         self.area_status.set("Area not selected")
         self.rect_info = None
         self.pdf_status.set(f"Template: {os.path.basename(path)} ({self.pix.width} x {self.pix.height}px)")
+        self.refresh_metrics()
         self.update_ready_state()
 
     def choose_names(self) -> None:
@@ -238,6 +383,7 @@ class CertificateApp:
         self.names_path = path
         self.names = names
         self.names_status.set(f"{len(names)} name(s) ready from {os.path.basename(path)}")
+        self.refresh_metrics()
         self.update_ready_state()
 
     def load_pdf_preview(self, path: str) -> bool:
@@ -267,6 +413,7 @@ class CertificateApp:
         if not rect_start or not rect_end:
             self.area_status.set("Area not selected — draw a rectangle and confirm")
             print("[DEBUG] Rectangle selection missing: rect_start=%s rect_end=%s" % (rect_start, rect_end))
+            self.refresh_metrics()
             self.update_ready_state()
             return
 
@@ -274,6 +421,7 @@ class CertificateApp:
         if rect_start == rect_end:
             self.area_status.set("Area not selected — rectangle has zero size")
             print("[DEBUG] Rectangle selection zero-size: rect_start=%s rect_end=%s" % (rect_start, rect_end))
+            self.refresh_metrics()
             self.update_ready_state()
             return
 
@@ -285,6 +433,7 @@ class CertificateApp:
         rect_height = int(self.rect_info["rect_height"])
         self.area_status.set(f"Selected area: {rect_width} x {rect_height} px")
         print("[DEBUG] Rectangle selection accepted: start=%s end=%s size=%sx%s" % (norm_start, norm_end, rect_width, rect_height))
+        self.refresh_metrics()
         self.update_ready_state()
 
     def start_review(self) -> None:
@@ -363,7 +512,7 @@ class CertificateApp:
         result: dict = {}
         window = tk.Toplevel(self.root)
         window.title(f"Review Certificate — {name_text}")
-        window.configure(bg=PALETTE["card"], padx=12, pady=12)
+        window.configure(bg=self.palette["card"], padx=12, pady=12)
         window.columnconfigure(0, weight=1)
         window.columnconfigure(1, weight=0)
         window.rowconfigure(0, weight=1)
@@ -413,8 +562,8 @@ class CertificateApp:
             orient="horizontal",
             variable=size_var,
             command=lambda _: update_preview(),
-            bg=PALETTE["card"],
-            troughcolor=PALETTE["outline"],
+            bg=self.palette["card"],
+            troughcolor=self.palette["outline"],
             highlightthickness=0,
             sliderrelief="flat",
         )
@@ -429,8 +578,8 @@ class CertificateApp:
             resolution=1,
             variable=x_offset_var,
             command=lambda _: update_preview(),
-            bg=PALETTE["card"],
-            troughcolor=PALETTE["outline"],
+            bg=self.palette["card"],
+            troughcolor=self.palette["outline"],
             highlightthickness=0,
             sliderrelief="flat",
         )
@@ -445,8 +594,8 @@ class CertificateApp:
             resolution=1,
             variable=y_offset_var,
             command=lambda _: update_preview(),
-            bg=PALETTE["card"],
-            troughcolor=PALETTE["outline"],
+            bg=self.palette["card"],
+            troughcolor=self.palette["outline"],
             highlightthickness=0,
             sliderrelief="flat",
         )
@@ -474,7 +623,7 @@ class CertificateApp:
                         int(self.rect_info["tk_right"]),
                         int(self.rect_info["tk_bottom"]),
                     ],
-                    outline=PALETTE["accent"],
+                    outline=self.palette["accent"],
                     width=2,
                 )
 
@@ -558,7 +707,7 @@ class CertificateApp:
 
         win = tk.Toplevel(self.root)
         win.title("Mark name placement area")
-        win.configure(bg=PALETTE["card"])
+        win.configure(bg=self.palette["card"])
 
         window_width = min(pix.width + 60, win.winfo_screenwidth() - 40)
         window_height = min(pix.height + 180, win.winfo_screenheight() - 80)
@@ -579,7 +728,7 @@ class CertificateApp:
             height=pix.height,
             bg="#0b1220",
             highlightthickness=2,
-            highlightbackground=PALETTE["outline"],
+            highlightbackground=self.palette["outline"],
         )
         canvas_widget.pack(pady=10)
         tk_img = ImageTk.PhotoImage(img)
@@ -592,7 +741,7 @@ class CertificateApp:
         def on_mouse_down(event):
             nonlocal rect_id
             selection["start"] = (event.x, event.y)
-            rect_id = canvas_widget.create_rectangle(event.x, event.y, event.x, event.y, outline=PALETTE["accent"], width=2)
+            rect_id = canvas_widget.create_rectangle(event.x, event.y, event.x, event.y, outline=self.palette["accent"], width=2)
             print("[DEBUG] Rectangle mouse_down start=%s" % (selection["start"],))
 
         def on_mouse_move(event):
@@ -646,6 +795,7 @@ class CertificateApp:
         return None, None
 
     def update_ready_state(self) -> None:
+        self.refresh_metrics()
         ready = bool(self.pdf_path and self.names and self.rect_info)
         if ready:
             self.start_button.state(["!disabled"])
