@@ -19,29 +19,27 @@ with open(txt_path, 'r') as f:
     names = [line.strip() for line in f.readlines() if line.strip()]
 
 # -------------------- Register Fonts --------------------
-FONT_FILES = [
-    ("Arial-Bold", r"C:\\Users\\moham\\Downloads\\Compressed\\arial\\ARIALBD.TTF"),
-    ("Montserrat", r"C:\\Users\\moham\\Downloads\\Montserrat\\Montserrat-VariableFont_wght.ttf"),
-    ("Montserrat-Italic", r"C:\\Users\\moham\\Downloads\\Montserrat\\Montserrat-Italic-VariableFont_wght.ttf"),
-]
 
+# Automatically load all TTF/OTF fonts from the 'fonts' directory
+fonts_dir = os.path.join(os.path.dirname(__file__), "fonts")
 available_fonts = {}
-missing_fonts = []
 
-for font_label, font_path in FONT_FILES:
-    if os.path.exists(font_path):
-        pdfmetrics.registerFont(TTFont(font_label, font_path))
-        available_fonts[font_label] = font_path
-    else:
-        missing_fonts.append((font_label, font_path))
+if not os.path.exists(fonts_dir):
+    os.makedirs(fonts_dir)
+
+for font_file in os.listdir(fonts_dir):
+    if font_file.lower().endswith(('.ttf', '.otf')):
+        font_path = os.path.join(fonts_dir, font_file)
+        font_label = os.path.splitext(font_file)[0]
+        try:
+            pdfmetrics.registerFont(TTFont(font_label, font_path))
+            available_fonts[font_label] = font_path
+        except Exception as e:
+            print(f"Warning: Could not register font '{font_label}' at {font_path}: {e}")
 
 if not available_fonts:
-    messagebox.showerror("Font Error", "No configured fonts were found. Please verify the font paths in cert_fill.py.")
+    messagebox.showerror("Font Error", f"No fonts found in '{fonts_dir}'. Please add .ttf or .otf font files to this folder.")
     raise SystemExit(1)
-
-if missing_fonts:
-    for missing_font, missing_path in missing_fonts:
-        print(f"Warning: Font '{missing_font}' not found at {missing_path}")
 
 current_font_choice = next(iter(available_fonts))
     

@@ -23,11 +23,43 @@ def sanitize_filename(name):
     return re.sub(r'[\/\\\:\*\?\"\<\>\|]', '_', name)
 
 # -------------------- Register Fonts --------------------
-# Register Arial Bold
-pdfmetrics.registerFont(TTFont('Arial-Bold', r'C:\Users\moham\Downloads\Compressed\arial\ARIALBD.TTF'))
 
-# Use it for names
-font_name = 'Arial-Bold'
+# Automatically load all TTF/OTF fonts from the 'fonts' directory
+import os
+fonts_dir = os.path.join(os.path.dirname(__file__), "fonts")
+available_fonts = {}
+
+if not os.path.exists(fonts_dir):
+    os.makedirs(fonts_dir)
+
+for font_file in os.listdir(fonts_dir):
+    if font_file.lower().endswith(('.ttf', '.otf')):
+        font_path = os.path.join(fonts_dir, font_file)
+        font_label = os.path.splitext(font_file)[0]
+        try:
+            pdfmetrics.registerFont(TTFont(font_label, font_path))
+            available_fonts[font_label] = font_path
+        except Exception as e:
+            print(f"Warning: Could not register font '{font_label}' at {font_path}: {e}")
+
+if not available_fonts:
+    messagebox.showerror("Font Error", f"No fonts found in '{fonts_dir}'. Please add .ttf or .otf font files to this folder.")
+    exit()
+
+# Let user choose font from dropdown
+font_choice_window = tk.Tk()
+font_choice_window.title("Choose Font for Certificate Names")
+tk.Label(font_choice_window, text="Select Font:").pack(padx=10, pady=10)
+font_var = tk.StringVar(value=next(iter(available_fonts)))
+font_dropdown = tk.OptionMenu(font_choice_window, font_var, *available_fonts.keys())
+font_dropdown.pack(padx=10, pady=10)
+
+def confirm_font():
+    font_choice_window.destroy()
+
+tk.Button(font_choice_window, text="Confirm", command=confirm_font).pack(pady=10)
+font_choice_window.mainloop()
+font_name = font_var.get()
     
 # -------------------- Draw Rectangle --------------------
 doc = fitz.open(pdf_path)
