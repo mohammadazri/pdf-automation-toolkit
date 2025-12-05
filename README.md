@@ -33,11 +33,19 @@
    ```sh
    pip install -r requirements.txt
    ```
-3. Run the scripts:
+
+3. Add your font files:
+   - Place any `.ttf` or `.otf` font files you want to use in the new `fonts` folder inside the project directory.
+   - The scripts will automatically detect all fonts in this folder and let you choose which one to use for certificate names.
+
+4. Run the scripts:
    ```sh
    python clean_participant_names.py
-   python generate_certificates.py
+   python auto_certificate_name_filler.py
+   python auto_cert_with_manual verification.py
    ```
+
+When running the certificate scripts, you'll be prompted to select your desired font from a dropdown menu. No code changes are needed to use new fonts—just add them to the `fonts` folder!
 
 That's it! Your certificates will be saved in the same folder. You can change the scripts to use your own PDF design or adjust how the names are cleaned.
 
