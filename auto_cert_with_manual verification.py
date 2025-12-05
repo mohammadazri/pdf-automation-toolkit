@@ -27,18 +27,21 @@ available_fonts = {}
 if not os.path.exists(fonts_dir):
     os.makedirs(fonts_dir)
 
-for font_file in os.listdir(fonts_dir):
-    if font_file.lower().endswith(('.ttf', '.otf')):
-        font_path = os.path.join(fonts_dir, font_file)
-        font_label = os.path.splitext(font_file)[0]
-        try:
-            pdfmetrics.registerFont(TTFont(font_label, font_path))
-            available_fonts[font_label] = font_path
-        except Exception as e:
-            print(f"Warning: Could not register font '{font_label}' at {font_path}: {e}")
+# Recursively search for font files in all subfolders
+for root, dirs, files in os.walk(fonts_dir):
+    family = os.path.basename(root)
+    for font_file in files:
+        if font_file.lower().endswith(('.ttf', '.otf')):
+            font_path = os.path.join(root, font_file)
+            font_label = f"{family}/{os.path.splitext(font_file)[0]}" if family != "fonts" else os.path.splitext(font_file)[0]
+            try:
+                pdfmetrics.registerFont(TTFont(font_label, font_path))
+                available_fonts[font_label] = font_path
+            except Exception as e:
+                print(f"Warning: Could not register font '{font_label}' at {font_path}: {e}")
 
 if not available_fonts:
-    messagebox.showerror("Font Error", f"No fonts found in '{fonts_dir}'. Please add .ttf or .otf font files to this folder.")
+    messagebox.showerror("Font Error", f"No fonts found in '{fonts_dir}' or its subfolders. Please add .ttf or .otf font files.")
     raise SystemExit(1)
 
 current_font_choice = next(iter(available_fonts))
