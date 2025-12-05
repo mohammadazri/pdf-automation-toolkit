@@ -1,5 +1,3 @@
-"""Modernized automatic certificate generator with guided UI."""
-
 import io
 import os
 import re
@@ -117,9 +115,12 @@ class AutoCertificateApp:
         self.rect_info: Optional[dict] = None
         self.preview_photo: Optional[ImageTk.PhotoImage] = None
 
+        self.output_dir: str = self.default_output_dir()
+
         self.pdf_status = tk.StringVar(value="No template selected")
         self.names_status = tk.StringVar(value="No names file selected")
         self.area_status = tk.StringVar(value="Area not selected")
+        self.output_status = tk.StringVar(value=f"Output: {self.output_dir}")
         self.progress_status = tk.StringVar(value="Waiting to start…")
         self.names_metric = tk.StringVar(value="0")
         self.area_metric = tk.StringVar(value="Not selected")
@@ -145,6 +146,11 @@ class AutoCertificateApp:
             self.area_metric.set(f"{int(self.rect_info['rect_width'])} × {int(self.rect_info['rect_height'])} px")
         else:
             self.area_metric.set("Not selected")
+
+    def default_output_dir(self) -> str:
+        base = os.path.join(os.path.dirname(__file__), "output")
+        os.makedirs(base, exist_ok=True)
+        return base
 
     def append_log(self, message: str) -> None:
         if not self.log_text:
@@ -330,6 +336,7 @@ class AutoCertificateApp:
             ("Template", self.pdf_status),
             ("Names", self.names_status),
             ("Placement", self.area_status),
+            ("Output", self.output_status),
         ]
         for idx, (label_text, text_var) in enumerate(summary_rows, start=2):
             row_frame = ttk.Frame(progress_card, style="Card.TFrame")
@@ -390,10 +397,17 @@ class AutoCertificateApp:
         ttk.Button(area_section, text="Select placement area", command=self.select_area).grid(row=1, column=0, padx=(0, 12), pady=4)
         ttk.Label(area_section, textvariable=self.area_status, style="Card.TLabel").grid(row=1, column=1, sticky="w")
 
+        output_section = ttk.Frame(container, style="Card.TFrame")
+        output_section.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+        output_section.columnconfigure(1, weight=1)
+        ttk.Label(output_section, text="4. Output", style="Emphasis.TLabel").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        ttk.Button(output_section, text="Choose output folder", command=self.choose_output_dir).grid(row=1, column=0, padx=(0, 12), pady=4)
+        ttk.Label(output_section, textvariable=self.output_status, style="Card.TLabel", wraplength=420).grid(row=1, column=1, sticky="w")
+
         review_section = ttk.Frame(container, style="Card.TFrame")
-        review_section.grid(row=4, column=0, sticky="ew", pady=(18, 0))
+        review_section.grid(row=5, column=0, sticky="ew", pady=(18, 0))
         review_section.columnconfigure(0, weight=1)
-        ttk.Label(review_section, text="4. Generate", style="Emphasis.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
+        ttk.Label(review_section, text="5. Generate", style="Emphasis.TLabel").grid(row=0, column=0, sticky="w", pady=(0, 6))
         self.start_button = ttk.Button(review_section, text="Generate certificates", style="Accent.TButton", command=self.start_generation)
         self.start_button.grid(row=1, column=0, sticky="ew")
         self.start_button.state(["disabled"])
@@ -436,6 +450,16 @@ class AutoCertificateApp:
         self.refresh_metrics()
         self.update_ready_state()
         self.append_log(f"Loaded {len(names)} names from {os.path.basename(path)}")
+
+    def choose_output_dir(self) -> None:
+        path = filedialog.askdirectory(title="Select output folder")
+        if not path:
+            return
+        os.makedirs(path, exist_ok=True)
+        self.output_dir = path
+        self.output_status.set(f"Output: {path}")
+        self.append_log(f"Output folder set to {path}")
+        self.update_ready_state()
 
     def load_pdf_preview(self, path: str) -> bool:
         try:
@@ -483,9 +507,11 @@ class AutoCertificateApp:
         self.update_preview_snapshot()
 
     def start_generation(self) -> None:
-        if not self.pdf_path or not self.names or not self.rect_info:
-            messagebox.showinfo("Missing info", "Please finish selecting files, font, and area first.")
+        if not self.pdf_path or not self.names or not self.rect_info or not self.output_dir:
+            messagebox.showinfo("Missing info", "Please finish selecting files, font, area, and output folder first.")
             return
+
+        os.makedirs(self.output_dir, exist_ok=True)
 
         self.clear_log()
         if self.progress_bar:
@@ -561,7 +587,7 @@ class AutoCertificateApp:
         base_page.merge_page(overlay_reader.pages[0])
         writer.add_page(base_page)
 
-        output_filename = f"certificate_{sanitize_filename(name_text)}.pdf"
+        output_filename = os.path.join(self.output_dir, f"certificate_{sanitize_filename(name_text)}.pdf")
         with open(output_filename, "wb") as out_file:
             writer.write(out_file)
 
@@ -652,7 +678,7 @@ class AutoCertificateApp:
 
     def update_ready_state(self) -> None:
         self.refresh_metrics()
-        ready = bool(self.pdf_path and self.names and self.rect_info)
+        ready = bool(self.pdf_path and self.names and self.rect_info and self.output_dir)
         if ready:
             self.start_button.state(["!disabled"])
             self.progress_status.set("Ready to generate automatically")
@@ -664,6 +690,8 @@ class AutoCertificateApp:
                 missing.append("names file")
             if not self.rect_info:
                 missing.append("placement area")
+            if not self.output_dir:
+                missing.append("output folder")
             self.start_button.state(["disabled"])
             self.progress_status.set(f"Waiting: select {', '.join(missing)}")
 
